@@ -8,15 +8,20 @@ import requests
 from ics import Calendar
 from notion_client import Client
 
-from constants import LEARN_URL, QUIZ_URL
+
+NOTION_TOKEN = os.environ["NOTION_TOKEN"]
+NOTION_DATABASE_ID = os.environ["NOTION_DATABASE_ID"]
+
+QUIZ_URL = os.environ["QUIZ_URL"]
+LEARN_URL = os.environ["LEARN_URL"]
 
 NZST = pytz.timezone('Pacific/Auckland')
 
 
 def get_existing_events():
     """get existing events"""
-    notion = Client(auth=os.environ["NOTION_TOKEN"])
-    existing = notion.databases.query(database_id=os.environ["NOTION_DATABASE_ID"])
+    notion = Client(auth=NOTION_TOKEN)
+    existing = notion.databases.query(database_id=NOTION_DATABASE_ID)
     results = existing['results']
     existing_events = []
 
@@ -60,7 +65,7 @@ def read_calendar():
 
 def create_notion_pages(calendar: Calendar, existing_events):
     """create notion page"""
-    notion = Client(auth=os.environ["NOTION_TOKEN"])
+    notion = Client(auth=NOTION_TOKEN)
 
     for event in calendar.events:
         name = event.name
@@ -73,7 +78,7 @@ def create_notion_pages(calendar: Calendar, existing_events):
         course = list(event.categories)[0].split("-")[0]
 
         notion.pages.create(
-            parent={"database_id": os.environ["NOTION_DATABASE_ID"]},
+            parent={"database_id": NOTION_DATABASE_ID},
             properties={
                 "Name": {
                     "title": [
@@ -100,11 +105,11 @@ def create_notion_pages(calendar: Calendar, existing_events):
 
 def update_statuses(calendar: Calendar):
     """updates the statuses of each event"""
-    notion = Client(auth=os.environ["NOTION_TOKEN"])
+    notion = Client(auth=NOTION_TOKEN)
     current_time = datetime.now(NZST)
 
     # Retrieve all pages to get their IDs
-    database = notion.databases.query(database_id=os.environ["NOTION_DATABASE_ID"])
+    database = notion.databases.query(database_id=NOTION_DATABASE_ID)
 
     # Create a mapping of event names to page IDs
     pages = {}

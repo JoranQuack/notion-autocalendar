@@ -25,7 +25,8 @@ jobs:
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
-          NOTION_PAGE_ID: ${{ secrets.NOTION_PAGE_ID }}
+          QUIZ_URL: ${{ secrets.QUIZ_URL }}
+          LEARN_URL: ${{ secrets.LEARN_URL }}
         run: python main.py
 
       - name: commit files
