@@ -91,20 +91,20 @@ def create_notion_page(calendar: Calendar):
 
 def main():
     """main"""
-    print("Getting existing events...")
+    message = "Getting existing events... "
+    print(message)
     existing_events = get_existing_events()
-    print ("\033[A                             \033[A")
-    print("Getting existing events...✅")
+    print(f"\033[F\033[{len(message)}G✅")
 
-    print("Reading calendar...")
+    message = "Reading calendar... "
+    print(message)
     calendar = read_calendar(existing_events)
-    print ("\033[A                             \033[A")
-    print("Reading calendar...✅")
+    print(f"\033[F\033[{len(message)}G✅")
 
-    print("Creating Notion page...")
+    message = "Creating Notion page... "
+    print(message)
     create_notion_page(calendar)
-    print ("\033[A                             \033[A")
-    print("Creating Notion page...✅")
+    print(f"\033[F\033[{len(message)}G✅")
     print("Done!")
 
 
