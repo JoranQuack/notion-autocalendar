@@ -1,14 +1,17 @@
 # Use an official Python runtime as a parent image
-FROM python:3.14-rc-slim
+FROM python:3.13.1-alpine
 
-# Set the working directory in the container
-WORKDIR /
+# switch working directory
+WORKDIR /app
 
-# Copy the current directory contents into the container at /
-COPY . /
+# copy every content from the local file to the image
+COPY . /app
 
-# Install any needed dependencies specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# copy the requirements file into the image
+COPY ./requirements.txt /app/requirements.txt
+
+# install the dependencies and packages in the requirements file
+RUN pip install -r requirements.txt
 
 # Make port 8080 available to the world outside this container
 EXPOSE 8080
