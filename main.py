@@ -2,7 +2,6 @@
 
 import os
 from datetime import datetime
-from pprint import pprint
 
 import pytz
 import requests
