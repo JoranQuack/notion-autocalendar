@@ -8,9 +8,10 @@ import requests
 from ics import Calendar
 from notion_client import Client
 
-from constants import COURSE_COLOURS, LEARN_URL, QUIZ_URL
+from constants import LEARN_URL, QUIZ_URL
 
 NZST = pytz.timezone('Pacific/Auckland')
+
 
 def get_existing_events():
     """get existing events"""
@@ -18,13 +19,14 @@ def get_existing_events():
     existing = notion.databases.query(database_id=os.environ["NOTION_DATABASE_ID"])
     results = existing['results']
     existing_events = []
-    try:
-        for result in results:
+
+    for result in results:
+        try:
             event_name = result['properties']['Name']['title'][0]['text']['content']
             existing_events.append(event_name)
-        return existing_events
-    except KeyError:
-        return []
+        except (IndexError, KeyError):
+            continue
+    return existing_events
 
 
 def read_calendar():
@@ -68,8 +70,7 @@ def create_notion_pages(calendar: Calendar, existing_events):
 
         date = event.end.astimezone(NZST).isoformat()
 
-        course_name = list(event.categories)[0].split("-")[0]
-        course = f"{COURSE_COLOURS[course_name]} {course_name}"
+        course = list(event.categories)[0].split("-")[0]
 
         notion.pages.create(
             parent={"database_id": os.environ["NOTION_DATABASE_ID"]},
@@ -89,13 +90,9 @@ def create_notion_pages(calendar: Calendar, existing_events):
                     }
                 },
                 "Course": {
-                    "rich_text": [
-                        {
-                            "text": {
-                                "content": course
-                            }
-                        }
-                    ]
+                    "select": {
+                        "name": course
+                    }
                 }
             }
         )
@@ -127,8 +124,9 @@ def update_statuses(calendar: Calendar):
             continue
 
         open_time = event.begin.astimezone(NZST)
+        close_time = event.end.astimezone(NZST)
 
-        if current_time > open_time:
+        if current_time > open_time or open_time == close_time:
             notion.pages.update(
                 page_id=page_id,
                 properties={
