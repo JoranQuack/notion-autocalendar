@@ -5,7 +5,7 @@ from datetime import datetime
 
 import pytz
 import requests
-from ics import Calendar
+from ics import Calendar, Event
 from notion_client import Client
 
 
@@ -45,20 +45,30 @@ def read_calendar():
     for event in learn_cal.events:
         merged_cal.events.add(event)
 
-    opening_times = {}
+    events = dict()
     for event in merged_cal.events:
+        if event.name.startswith("Practice") or "example" in event.name:
+            continue
         if event.name.endswith("opens"):
             base_name = event.name.replace(" opens", "")
-            opening_times[base_name] = event.begin
+            events[base_name] = (event.begin, event.begin, event.categories)
+
+    for event in merged_cal.events:
+        if event.name.endswith("should be completed"):
+            base_name = event.name.replace(" should be completed", "")
+            if base_name in events:
+                events[base_name] = (events[base_name][0], event.begin, event.categories)
+        elif event.name.endswith("closes"):
+            base_name = event.name.replace(" closes", "")
+            if base_name in events:
+                if events[base_name][0] == events[base_name][1]:
+                    events[base_name] = (events[base_name][0], event.begin, event.categories)
 
     calendar = Calendar()
-    for event in merged_cal.events:
-        if event.name.endswith("closes"):
-            stripped_name = event.name.replace(" closes", "")
-            if stripped_name in opening_times:
-                event.begin = opening_times[stripped_name]
-            event.name = stripped_name
-            calendar.events.add(event)
+    for name, (begin, end, categories) in events.items():
+        event = Event()
+        event.name, event.begin, event.end, event.categories = name, begin, end, categories
+        calendar.events.add(event)
 
     return calendar
 
