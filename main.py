@@ -17,6 +17,8 @@ LEARN_URL = os.environ["LEARN_URL"]
 
 NZST = pytz.timezone('Pacific/Auckland')
 
+BLACKLIST = {"example", "practice"}
+
 
 def get_existing_events():
     """get existing events"""
@@ -47,11 +49,11 @@ def read_calendar():
 
     events = dict()
     for event in merged_cal.events:
-        if event.name.startswith("Practice") or "example" in event.name:
+        if event.name.lower() in BLACKLIST:
             continue
         if event.name.endswith("opens"):
             base_name = event.name.replace(" opens", "")
-            events[base_name] = (event.begin, event.begin, event.categories)
+            events[base_name] = (event.begin, None, event.categories)
 
     for event in merged_cal.events:
         if event.name.endswith("should be completed"):
@@ -66,6 +68,8 @@ def read_calendar():
 
     calendar = Calendar()
     for name, (begin, end, categories) in events.items():
+        if end is None:
+            continue
         event = Event()
         event.name, event.begin, event.end, event.categories = name, begin, end, categories
         calendar.events.add(event)
