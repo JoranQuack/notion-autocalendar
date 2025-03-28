@@ -49,11 +49,13 @@ def read_calendar():
 
     events = dict()
     for event in merged_cal.events:
-        if event.name.lower() in BLACKLIST:
-            continue
-        if event.name.endswith("opens"):
-            base_name = event.name.replace(" opens", "")
-            events[base_name] = (event.begin, None, event.categories)
+        for word in BLACKLIST:
+            if word in event.name.lower():
+                break
+        else:
+            if event.name.endswith("opens"):
+                base_name = event.name.replace(" opens", "")
+                events[base_name] = (event.begin, None, event.categories)
 
     for event in merged_cal.events:
         if event.name.endswith("should be completed"):
