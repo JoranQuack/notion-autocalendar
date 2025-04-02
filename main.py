@@ -2,6 +2,7 @@
 
 import os
 from datetime import datetime
+# import pprint
 
 import pytz
 import requests
@@ -47,6 +48,8 @@ def read_calendar():
     for event in learn_cal.events:
         merged_cal.events.add(event)
 
+    # pprint.pprint(merged_cal.events)
+
     events = dict()
     for event in merged_cal.events:
         for word in BLACKLIST:
@@ -65,7 +68,7 @@ def read_calendar():
         elif event.name.endswith("closes"):
             base_name = event.name.replace(" closes", "")
             if base_name in events:
-                if events[base_name][0] == events[base_name][1]:
+                if events[base_name][1] is None:
                     events[base_name] = (events[base_name][0], event.begin, event.categories)
 
     calendar = Calendar()
@@ -167,6 +170,7 @@ def main():
     print(message)
     calendar = read_calendar()
     print(f"\033[F\033[{len(message)}G✅")
+    # pprint.pprint(calendar.events)
 
     message = "Getting existing events... "
     print(message)
