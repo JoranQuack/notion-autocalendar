@@ -2,6 +2,10 @@
 
 A small Python project that automatically populates my Notion To-Do list database with events from the UC Moodle servers.
 
+## Status
+
+[![run main.py](https://github.com/JoranQuack/notion-autocalendar/actions/workflows/actions.yml/badge.svg)](https://github.com/JoranQuack/notion-autocalendar/actions/workflows/actions.yml)
+
 ## Acknowledgements
 
 - [Ethan Elliot](https://github.com/ethanelliot/) - Inspiration, mentor, and pookie.
