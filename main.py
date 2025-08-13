@@ -2,12 +2,17 @@
 
 import os
 from datetime import datetime
+
 # import pprint
 
 import pytz
 import requests
 from ics import Calendar, Event
 from notion_client import Client
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 NOTION_TOKEN = os.environ["NOTION_TOKEN"]
@@ -16,7 +21,7 @@ NOTION_DATABASE_ID = os.environ["NOTION_DATABASE_ID"]
 QUIZ_URL = os.environ["QUIZ_URL"]
 LEARN_URL = os.environ["LEARN_URL"]
 
-NZST = pytz.timezone('Pacific/Auckland')
+NZST = pytz.timezone("Pacific/Auckland")
 
 BLACKLIST = {"example", "practice"}
 
@@ -25,12 +30,12 @@ def get_existing_events():
     """get existing events"""
     notion = Client(auth=NOTION_TOKEN)
     existing = notion.databases.query(database_id=NOTION_DATABASE_ID)
-    results = existing['results']
+    results = existing["results"]  # type: ignore
     existing_events = []
 
     for result in results:
         try:
-            event_name = result['properties']['Name']['title'][0]['text']['content']
+            event_name = result["properties"]["Name"]["title"][0]["text"]["content"]
             existing_events.append(event_name)
         except (IndexError, KeyError):
             continue
@@ -64,19 +69,42 @@ def read_calendar():
         if event.name.endswith("should be completed"):
             base_name = event.name.replace(" should be completed", "")
             if base_name in events:
-                events[base_name] = (events[base_name][0], event.begin, event.categories)
+                events[base_name] = (
+                    events[base_name][0],
+                    event.begin,
+                    event.categories,
+                )
         elif event.name.endswith("closes"):
             base_name = event.name.replace(" closes", "")
             if base_name in events:
                 if events[base_name][1] is None:
-                    events[base_name] = (events[base_name][0], event.begin, event.categories)
+                    events[base_name] = (
+                        events[base_name][0],
+                        event.begin,
+                        event.categories,
+                    )
+            else:
+                for word in BLACKLIST:
+                    if word in base_name.lower():
+                        break
+                else:
+                    events[base_name] = (
+                        datetime(1900, 1, 1),
+                        event.begin,
+                        event.categories,
+                    )
 
     calendar = Calendar()
     for name, (begin, end, categories) in events.items():
         if end is None:
             continue
         event = Event()
-        event.name, event.begin, event.end, event.categories = name, begin, end, categories
+        event.name, event.begin, event.end, event.categories = (
+            name,
+            begin,
+            end,
+            categories,
+        )
         calendar.events.add(event)
 
     return calendar
@@ -99,26 +127,10 @@ def create_notion_pages(calendar: Calendar, existing_events):
         notion.pages.create(
             parent={"database_id": NOTION_DATABASE_ID},
             properties={
-                "Name": {
-                    "title": [
-                        {
-                            "text": {
-                                "content": name
-                            }
-                        }
-                    ]
-                },
-                "Due Date": {
-                    "date": {
-                        "start": date
-                    }
-                },
-                "Course": {
-                    "select": {
-                        "name": course
-                    }
-                }
-            }
+                "Name": {"title": [{"text": {"content": name}}]},
+                "Due Date": {"date": {"start": date}},
+                "Course": {"select": {"name": course}},
+            },
         )
 
 
@@ -132,11 +144,11 @@ def update_statuses(calendar: Calendar):
 
     # Create a mapping of event names to page IDs
     pages = {}
-    for result in database['results']:
+    for result in database["results"]:  # type: ignore
         try:
-            page_name = result['properties']['Name']['title'][0]['text']['content']
-            page_status = result['properties']['Status']['status']['name']
-            page_id = result['id']
+            page_name = result["properties"]["Name"]["title"][0]["text"]["content"]
+            page_status = result["properties"]["Status"]["status"]["name"]
+            page_id = result["id"]
             pages[page_name] = (page_id, page_status)
         except (KeyError, IndexError):
             continue
@@ -152,16 +164,8 @@ def update_statuses(calendar: Calendar):
 
         if current_time > open_time or open_time == close_time:
             notion.pages.update(
-                page_id=page_id,
-                properties={
-                    "Status": {
-                        "status": {
-                            "name": "Open"
-                        }
-                    }
-                }
+                page_id=page_id, properties={"Status": {"status": {"name": "Open"}}}
             )
-
 
 
 def main():
