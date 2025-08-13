@@ -2,7 +2,7 @@ name: run main.py
 
 on:
   schedule:
-    - cron: "0 */1 * * *" # run every hour
+    - cron: "5 0,9-17/1 * * *" # run after midnight and every hour during office hours (5 minutes delay)
 
 jobs:
   build:
