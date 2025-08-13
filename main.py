@@ -3,15 +3,12 @@
 import os
 from datetime import datetime
 
-# import pprint
-
 import pytz
 import requests
 from ics import Calendar, Event
 from notion_client import Client
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
 load_dotenv()
 
 
