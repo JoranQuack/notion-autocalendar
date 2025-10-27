@@ -51,7 +51,7 @@ Create Python Virtual Environment (you will need Python3 installed)
 Install dependencies (requires pip to be installed)
 
 ```bash
-  pip install -r /path/to/requirements.txt
+  pip install -r requirements.txt
 ```
 
 Run the script
