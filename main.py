@@ -32,7 +32,7 @@ def get_existing_events():
 
     for result in results:
         try:
-            event_name = result["properties"]["Name"]["title"][0]["text"]["content"]
+            event_name = result["properties"]["Title"]["title"][0]["text"]["content"]
             existing_events.append(event_name)
         except (IndexError, KeyError):
             continue
@@ -124,9 +124,10 @@ def create_notion_pages(calendar: Calendar, existing_events):
         notion.pages.create(
             parent={"database_id": NOTION_DATABASE_ID},
             properties={
-                "Name": {"title": [{"text": {"content": name}}]},
-                "Due Date": {"date": {"start": date}},
-                "Course": {"select": {"name": course}},
+                "Title": {"title": [{"text": {"content": name}}]},
+                "Date": {"date": {"start": date}},
+                "Tags": {"multi_select": [{"name": course}]},
+                "Priority Level": {"select": {"name": "No Priority"}},
             },
         )
 
@@ -143,8 +144,8 @@ def update_statuses(calendar: Calendar):
     pages = {}
     for result in database["results"]:  # type: ignore
         try:
-            page_name = result["properties"]["Name"]["title"][0]["text"]["content"]
-            page_status = result["properties"]["Status"]["status"]["name"]
+            page_name = result["properties"]["Title"]["title"][0]["text"]["content"]
+            page_status = result["properties"]["Priority Level"]["select"]
             page_id = result["id"]
             pages[page_name] = (page_id, page_status)
         except (KeyError, IndexError):
@@ -153,7 +154,7 @@ def update_statuses(calendar: Calendar):
     for event in calendar.events:
         page_id, page_status = pages[event.name]
 
-        if page_status != "Upcoming":
+        if page_status is not None:
             continue
 
         open_time = event.begin.astimezone(NZST)
@@ -161,32 +162,33 @@ def update_statuses(calendar: Calendar):
 
         if current_time > open_time or open_time == close_time:
             notion.pages.update(
-                page_id=page_id, properties={"Status": {"status": {"name": "Open"}}}
+                page_id=page_id,
+                properties={"Priority Level": {"select": {"name": "Medium Priority"}}},
             )
 
 
 def main():
     """main"""
     message = "Reading calendar... "
-    print(message)
+    print(message, end="")
     calendar = read_calendar()
-    print(f"\033[F\033[{len(message)}G✅")
+    print("✅")
     # pprint.pprint(calendar.events)
 
     message = "Getting existing events... "
-    print(message)
+    print(message, end="")
     existing_events = get_existing_events()
-    print(f"\033[F\033[{len(message)}G✅")
+    print("✅")
 
     message = "Creating new Notion pages... "
-    print(message)
+    print(message, end="")
     create_notion_pages(calendar, existing_events)
-    print(f"\033[F\033[{len(message)}G✅")
+    print("✅")
 
     message = "Updating statuses... "
-    print(message)
+    print(message, end="")
     update_statuses(calendar)
-    print(f"\033[F\033[{len(message)}G✅")
+    print("✅")
     print("Done!")
 
 
