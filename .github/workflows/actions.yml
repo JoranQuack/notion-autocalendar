@@ -2,8 +2,7 @@ name: run main.py
 
 on:
   schedule:
-    - cron: "5 0-6/1,12,20-23/1 * * *" # run after midnight and every hour during office hours (5 minutes delay) NZST
-
+    - cron: "0 21,0,7 * * *" # Runs at 09:00, 12:00, 19:00 NZST (UTC+12)
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -11,15 +10,11 @@ jobs:
       - name: checkout repo content
         uses: actions/checkout@v4 # checkout the repository content to github runner
 
-      - name: setup python
-        uses: actions/setup-python@v5 # setup python version
-        with:
-          python-version: "3.13" # install the python version needed
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
 
-      - name: install python packages
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+      - name: Install dependencies
+        run: uv sync
 
       - name: execute py script # run main.py
         env:
@@ -27,7 +22,7 @@ jobs:
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
           QUIZ_URL: ${{ secrets.QUIZ_URL }}
           LEARN_URL: ${{ secrets.LEARN_URL }}
-        run: python main.py
+        run: uv run main.py
 
       - name: commit files
         run: |
