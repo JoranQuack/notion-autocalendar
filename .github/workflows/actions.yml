@@ -2,7 +2,7 @@ name: run main.py
 
 on:
   schedule:
-    - cron: "0 21,0,7 * * *" # Runs at 09:00, 12:00, 19:00 NZST (UTC+12)
+    - cron: "0 * * * *"
 jobs:
   build:
     runs-on: ubuntu-latest
