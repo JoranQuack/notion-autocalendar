@@ -1,0 +1,42 @@
+[project]
+name = "notion-autocalendar"
+version = "0.1.0"
+description = "A tool to automatically create calendar events in Notion from .ics files."
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "ics>=0.7.2",
+    "notion-client==2.3.0",
+    "python-dotenv>=1.2.1",
+    "pytz>=2025.2",
+    "requests>=2.32.5",
+    "wget>=3.2",
+    "rich",
+]
+
+[dependency-groups]
+dev = [
+    "types-python-dateutil>=2.9.0.20260124",
+    "types-pytz>=2025.2.0.20251108",
+    "types-requests>=2.32.4.20260107",
+    "mypy",
+    "ruff",
+]
+
+[tool.mypy]
+strict = true
+
+[[tool.mypy.overrides]]
+module = "ics"
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "E501",  # Line too long
+    "D203",  # 1 blank line required before class docstring (found 0)
+    "D213",  # Multi-line docstring summary should start at the first line
+]

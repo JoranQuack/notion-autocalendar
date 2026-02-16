@@ -33,31 +33,16 @@ Go to the project directory
   cd notion-autocalendar
 ```
 
-Create Python Virtual Environment (you will need Python3 installed)
+Create Python Virtual Environment and install dependencies with [uv](https://github.com/astral-sh/uv)
 
 ```bash
-  # MacOS/Linux
-  # You may need to run `sudo apt-get install python3-venv` first on Debian-based OSs
-  python3 -m venv .venv
-  source .venv/bin/activate
-
-  # Windows
-  # You can also use `py -3 -m venv .venv`
-  python -m venv .venv
-  .venv\Scripts\activate
-
-```
-
-Install dependencies (requires pip to be installed)
-
-```bash
-  pip install -r requirements.txt
+  uv sync
 ```
 
 Run the script
 
 ```bash
-  python main.py
+  uv run main.py
 ```
 
 ## Authors

@@ -1,125 +1,153 @@
-"""main"""
+"""Main module for syncing calendar events into Notion."""
 
 import os
 from datetime import datetime
+from typing import TYPE_CHECKING, Any, cast
 
 import pytz
 import requests
+from dotenv import load_dotenv
 from ics import Calendar, Event
 from notion_client import Client
-from dotenv import load_dotenv
+from rich.console import Console
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 load_dotenv()
+
+
+CONSOLE = Console()
 
 
 NOTION_TOKEN = os.environ["NOTION_TOKEN"]
 NOTION_DATABASE_ID = os.environ["NOTION_DATABASE_ID"]
 
-QUIZ_URL = os.environ["QUIZ_URL"]
-LEARN_URL = os.environ["LEARN_URL"]
+QUIZ_URL = os.environ.get("QUIZ_URL", "")
+LEARN_URL = os.environ.get("LEARN_URL", "")
 
 NZST = pytz.timezone("Pacific/Auckland")
 
-BLACKLIST = {"example", "practice"}
+BLACKLIST: set[str] = {"example", "practice"}
 
 
-def get_existing_events():
-    """get existing events"""
+def get_existing_events() -> list[str]:
+    """Return a list of event titles already present in the Notion database."""
     notion = Client(auth=NOTION_TOKEN)
-    existing = notion.databases.query(database_id=NOTION_DATABASE_ID)
-    results = existing["results"]  # type: ignore
-    existing_events = []
+    existing = cast("dict[str, Any]", notion.databases.query(database_id=NOTION_DATABASE_ID))
+    results = existing.get("results", [])
+    existing_events: list[str] = []
 
     for result in results:
         try:
             event_name = result["properties"]["Title"]["title"][0]["text"]["content"]
-            existing_events.append(event_name)
         except (IndexError, KeyError):
             continue
+        existing_events.append(event_name)
+
     return existing_events
 
 
-def read_calendar():
-    """read calendar"""
+def fetch_and_merge_calendars() -> Calendar:
+    """Fetch remote calendars and merge events into a single Calendar."""
     quiz_cal = Calendar(requests.get(QUIZ_URL, timeout=10).text)
     learn_cal = Calendar(requests.get(LEARN_URL, timeout=10).text)
 
     merged_cal = Calendar()
-    for event in quiz_cal.events:
-        merged_cal.events.add(event)
-    for event in learn_cal.events:
-        merged_cal.events.add(event)
+    for ev in quiz_cal.events:
+        merged_cal.events.add(ev)
+    for ev in learn_cal.events:
+        merged_cal.events.add(ev)
+    return merged_cal
 
-    # pprint.pprint(merged_cal.events)
 
-    events = dict()
-    for event in merged_cal.events:
-        for word in BLACKLIST:
-            if word in event.name.lower():
-                break
-        else:
-            if event.name.endswith("opens"):
-                base_name = event.name.replace(" opens", "")
-                events[base_name] = (event.begin, None, event.categories)
+def is_blacklisted(name: str) -> bool:
+    """Check if the event name contains any blacklisted words."""
+    name_lower = name.lower()
+    return any(word in name_lower for word in BLACKLIST)
 
-    for event in merged_cal.events:
-        if event.name.endswith("should be completed"):
-            base_name = event.name.replace(" should be completed", "")
+
+def process_opens_events(
+    merged_cal: Calendar,
+) -> dict[str, tuple[Any, Any | None, set[str] | None]]:
+    """Process events ending with 'opens' and initialize the events dictionary."""
+    events: dict[str, tuple[Any, Any | None, set[str] | None]] = {}
+    for ev in merged_cal.events:
+        if not ev.name or is_blacklisted(ev.name):
+            continue
+        if ev.name.endswith("opens"):
+            base_name = ev.name.replace(" opens", "")
+            events[base_name] = (ev.begin, None, ev.categories)
+    return events
+
+
+def process_closing_events(
+    merged_cal: Calendar, events: dict[str, tuple[Any, Any | None, set[str] | None]],
+) -> None:
+    """Process events ending with 'closes' or 'should be completed' and update dictionary."""
+    for ev in merged_cal.events:
+        if not ev.name:
+            continue
+
+        if ev.name.endswith("should be completed"):
+            base_name = ev.name.replace(" should be completed", "")
             if base_name in events:
+                start, _, _ = events[base_name]
+                events[base_name] = (start, ev.begin, ev.categories)
+
+        elif ev.name.endswith("closes"):
+            base_name = ev.name.replace(" closes", "")
+            if base_name in events:
+                start, end, _ = events[base_name]
+                if end is None:
+                    events[base_name] = (start, ev.begin, ev.categories)
+            elif not is_blacklisted(base_name):
                 events[base_name] = (
-                    events[base_name][0],
-                    event.begin,
-                    event.categories,
+                    datetime(1900, 1, 1, tzinfo=pytz.UTC).astimezone(NZST),
+                    ev.begin,
+                    ev.categories,
                 )
-        elif event.name.endswith("closes"):
-            base_name = event.name.replace(" closes", "")
-            if base_name in events:
-                if events[base_name][1] is None:
-                    events[base_name] = (
-                        events[base_name][0],
-                        event.begin,
-                        event.categories,
-                    )
-            else:
-                for word in BLACKLIST:
-                    if word in base_name.lower():
-                        break
-                else:
-                    events[base_name] = (
-                        datetime(1900, 1, 1),
-                        event.begin,
-                        event.categories,
-                    )
+
+
+def read_calendar() -> Calendar:
+    """Read remote calendars, merge them and return synthesized events.
+
+    The function looks for event pairs such as "<name> opens" and
+    "<name> closes" (or "<name> should be completed") and builds
+    a calendar with those intervals.
+    """
+    merged_cal = fetch_and_merge_calendars()
+    events = process_opens_events(merged_cal)
+    process_closing_events(merged_cal, events)
 
     calendar = Calendar()
     for name, (begin, end, categories) in events.items():
         if end is None:
             continue
-        event = Event()
-        event.name, event.begin, event.end, event.categories = (
-            name,
-            begin,
-            end,
-            categories,
-        )
-        calendar.events.add(event)
+        new_ev = Event()
+        new_ev.name = name
+        new_ev.begin = begin
+        new_ev.end = end
+        new_ev.categories = categories or set()
+        calendar.events.add(new_ev)
 
     return calendar
 
 
-def create_notion_pages(calendar: Calendar, existing_events):
-    """create notion page"""
+def create_notion_pages(calendar: Calendar, existing_events: Iterable[str]) -> None:
+    """Create Notion pages for events that don't already exist."""
     notion = Client(auth=NOTION_TOKEN)
 
-    for event in calendar.events:
-        name = event.name
-
-        if name in existing_events:
+    for ev in calendar.events:
+        name = ev.name
+        if not name or name in existing_events:
             continue
 
-        date = event.end.astimezone(NZST).isoformat()
+        date = ev.end.astimezone(NZST).isoformat()
 
-        course = list(event.categories)[0].split("-")[0]
+        course = ""
+        if ev.categories:
+            course = next(iter(ev.categories)).split("-")[0]
 
         notion.pages.create(
             parent={"database_id": NOTION_DATABASE_ID},
@@ -132,33 +160,36 @@ def create_notion_pages(calendar: Calendar, existing_events):
         )
 
 
-def update_statuses(calendar: Calendar):
-    """updates the statuses of each event"""
+def update_statuses(calendar: Calendar) -> None:
+    """Update 'Priority Level' for pages whose open time has passed."""
     notion = Client(auth=NOTION_TOKEN)
     current_time = datetime.now(NZST)
 
-    # Retrieve all pages to get their IDs
-    database = notion.databases.query(database_id=NOTION_DATABASE_ID)
+    database = cast("dict[str, Any]", notion.databases.query(database_id=NOTION_DATABASE_ID))
 
-    # Create a mapping of event names to page IDs
-    pages = {}
-    for result in database["results"]:  # type: ignore
+    pages: dict[str, tuple[str, dict[str, Any] | None]] = {}
+    for result in database.get("results", []):
         try:
             page_name = result["properties"]["Title"]["title"][0]["text"]["content"]
             page_status = result["properties"]["Priority Level"]["select"]
             page_id = result["id"]
-            pages[page_name] = (page_id, page_status)
         except (KeyError, IndexError):
             continue
+        pages[page_name] = (page_id, page_status)
 
-    for event in calendar.events:
-        page_id, page_status = pages[event.name]
+    for ev in calendar.events:
+        if not ev.name:
+            continue
+        page = pages.get(ev.name)
+        if page is None:
+            continue
+        page_id, page_status = page
 
         if page_status is not None:
             continue
 
-        open_time = event.begin.astimezone(NZST)
-        close_time = event.end.astimezone(NZST)
+        open_time = ev.begin.astimezone(NZST)
+        close_time = ev.end.astimezone(NZST)
 
         if current_time > open_time or open_time == close_time:
             notion.pages.update(
@@ -167,29 +198,24 @@ def update_statuses(calendar: Calendar):
             )
 
 
-def main():
-    """main"""
-    message = "Reading calendar... "
-    print(message, end="")
-    calendar = read_calendar()
-    print("✅")
-    # pprint.pprint(calendar.events)
+def main() -> None:
+    """Entry point for the script."""
+    with CONSOLE.status("Reading calendar..."):
+        calendar = read_calendar()
+    CONSOLE.print("[green]✓[/green] Calendar loaded")
 
-    message = "Getting existing events... "
-    print(message, end="")
-    existing_events = get_existing_events()
-    print("✅")
+    with CONSOLE.status("Getting existing events..."):
+        existing_events = get_existing_events()
+    CONSOLE.print("[green]✓[/green] Existing events fetched")
 
-    message = "Creating new Notion pages... "
-    print(message, end="")
-    create_notion_pages(calendar, existing_events)
-    print("✅")
+    with CONSOLE.status("Creating new Notion pages..."):
+        create_notion_pages(calendar, existing_events)
+    CONSOLE.print("[green]✓[/green] Notion pages created")
 
-    message = "Updating statuses... "
-    print(message, end="")
-    update_statuses(calendar)
-    print("✅")
-    print("Done!")
+    with CONSOLE.status("Updating statuses..."):
+        update_statuses(calendar)
+    CONSOLE.print("[green]✓[/green] Statuses updated")
+    CONSOLE.print("[bold green]Done![/bold green]")
 
 
 if __name__ == "__main__":
