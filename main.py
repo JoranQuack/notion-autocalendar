@@ -41,7 +41,7 @@ def get_existing_events() -> list[str]:
     for result in results:
         try:
             event_name = result["properties"]["Title"]["title"][0]["text"]["content"]
-        except (IndexError, KeyError):
+        except IndexError, KeyError:
             continue
         existing_events.append(event_name)
 
@@ -82,7 +82,8 @@ def process_opens_events(
 
 
 def process_closing_events(
-    merged_cal: Calendar, events: dict[str, tuple[Any, Any | None, set[str] | None]],
+    merged_cal: Calendar,
+    events: dict[str, tuple[Any, Any | None, set[str] | None]],
 ) -> None:
     """Process events ending with 'closes' or 'should be completed' and update dictionary."""
     for ev in merged_cal.events:
@@ -173,7 +174,7 @@ def update_statuses(calendar: Calendar) -> None:
             page_name = result["properties"]["Title"]["title"][0]["text"]["content"]
             page_status = result["properties"]["Priority Level"]["select"]
             page_id = result["id"]
-        except (KeyError, IndexError):
+        except KeyError, IndexError:
             continue
         pages[page_name] = (page_id, page_status)
 
@@ -194,7 +195,7 @@ def update_statuses(calendar: Calendar) -> None:
         if current_time > open_time or open_time == close_time:
             notion.pages.update(
                 page_id=page_id,
-                properties={"Priority Level": {"select": {"name": "Medium Priority"}}},
+                properties={"Priority Level": {"select": {"name": "Low Priority"}}},
             )
 
 
