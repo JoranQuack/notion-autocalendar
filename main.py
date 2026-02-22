@@ -30,6 +30,8 @@ NZST = pytz.timezone("Pacific/Auckland")
 
 BLACKLIST: set[str] = {"example", "practice"}
 
+HTTP_OK = 200
+
 
 def get_existing_events() -> list[str]:
     """Return a list of event titles already present in the Notion database."""
@@ -49,15 +51,47 @@ def get_existing_events() -> list[str]:
 
 
 def fetch_and_merge_calendars() -> Calendar:
-    """Fetch remote calendars and merge events into a single Calendar."""
-    quiz_cal = Calendar(requests.get(QUIZ_URL, timeout=10).text)
-    learn_cal = Calendar(requests.get(LEARN_URL, timeout=10).text)
+    """Fetch remote calendars and merge events into a single Calendar.
 
+    If a remote feed returns a non-ICS body (e.g. an authentication error),
+    skip that feed and continue gracefully.
+    """
+    urls = [("quiz", QUIZ_URL), ("learn", LEARN_URL)]
     merged_cal = Calendar()
-    for ev in quiz_cal.events:
-        merged_cal.events.add(ev)
-    for ev in learn_cal.events:
-        merged_cal.events.add(ev)
+
+    for name, url in urls:
+        if not url:
+            CONSOLE.print(f"[yellow]Warning:[/yellow] {name} URL not set, skipping")
+            continue
+
+        try:
+            resp = requests.get(url, timeout=10)
+        except requests.RequestException as exc:
+            CONSOLE.print(f"[red]Error:[/red] failed to fetch {name} calendar: {exc}")
+            continue
+
+        if resp.status_code != HTTP_OK:
+            CONSOLE.print(
+                f"[yellow]Warning:[/yellow] {name} feed returned HTTP {resp.status_code}, skipping",
+            )
+            continue
+
+        body = resp.text.strip()
+        if not body or body.lower().startswith("invalid") or "error" in body.lower():
+            CONSOLE.print(
+                f"[yellow]Warning:[/yellow] {name} feed returned non-ICS content, skipping",
+            )
+            continue
+
+        try:
+            cal = Calendar(body)
+        except ValueError as exc:
+            CONSOLE.print(f"[yellow]Warning:[/yellow] failed to parse {name} feed as ICS: {exc}")
+            continue
+
+        for ev in cal.events:
+            merged_cal.events.add(ev)
+
     return merged_cal
 
 
